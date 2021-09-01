@@ -164,6 +164,21 @@ They're typically codes for certain situations, such as "exactly correct", "corr
 
 These flags can be used to [categorise common errors](https://eprints.whiterose.ac.uk/91174/).
 
+WeBWorK
+*******
+
+Like DEWIS, WeBWorK questions are Perl programs which produce both the text and the marking routine.
+
+There are built-in `contexts <https://webwork.maa.org/wiki/ContextList>`__ which provide validation and marking routines, called 'answer checkers'. 
+
+The validation can be `configured by replacing individual methods <https://webwork.maa.org/wiki/Modifying_Contexts_(advanced)>`__, for example to parse different number notation styles.
+
+You can write your own answer checker as a Perl subroutine, which might use the built-in checkers.
+
+An `answer checker <https://webwork.maa.org/pod/pg/doc/MathObjects/MathObjectsAnswerCheckers.html#The-Context-and-Answer-Checkers>`__ returns a value between 0 and 1, representing the correctness of the student's answer, as well as a feedback message.
+
+There doesn't seem to be any facility for reporting properties of the student's answer for later analysis.
+
 Solution
 --------
 
