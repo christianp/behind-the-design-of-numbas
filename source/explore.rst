@@ -1,6 +1,9 @@
 Explore mode
 ============
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

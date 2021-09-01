@@ -1,6 +1,9 @@
 Diagnostic mode
 ===============
 
+.. page_status::
+    :kind: outline
+
 Motivation
 ----------
 

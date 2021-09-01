@@ -1,6 +1,9 @@
 Writing style for questions
 ===========================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

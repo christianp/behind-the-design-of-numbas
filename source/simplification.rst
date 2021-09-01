@@ -1,6 +1,9 @@
 Simplifying mathematical expressions
 ====================================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

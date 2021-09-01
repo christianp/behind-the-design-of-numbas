@@ -1,6 +1,9 @@
 Alternative answers
 ===================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

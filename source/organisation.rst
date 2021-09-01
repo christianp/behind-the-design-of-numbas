@@ -1,6 +1,9 @@
 Organising content
 ==================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

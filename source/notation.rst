@@ -1,6 +1,9 @@
 Parsing mathematical notation
 =============================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

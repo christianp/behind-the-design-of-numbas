@@ -1,6 +1,9 @@
 Pattern-matching mathematical expressions
 =========================================
 
+.. page_status::
+    :kind: outline
+
 https://www.overleaf.com/project/5b92712d47e18a0f04cc4763
 
 Problem

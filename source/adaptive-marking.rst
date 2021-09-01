@@ -1,6 +1,9 @@
 Adaptive marking
 ================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

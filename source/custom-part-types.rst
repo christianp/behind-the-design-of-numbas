@@ -1,6 +1,9 @@
 Custom part types
 =================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

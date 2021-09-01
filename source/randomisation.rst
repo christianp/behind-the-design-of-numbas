@@ -1,6 +1,9 @@
 Randomising questions
 =====================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

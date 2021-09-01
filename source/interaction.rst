@@ -1,6 +1,9 @@
 Methods of interaction
 ======================
 
+.. page_status::
+    :kind: outline
+
 Problem
 -------
 

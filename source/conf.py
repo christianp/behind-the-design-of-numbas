@@ -10,10 +10,10 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
-
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../extensions'))
+print(sys.path)
 
 # -- Project information -----------------------------------------------------
 
@@ -28,6 +28,7 @@ author = 'Christian Lawson-Perfect'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'pagestatus',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -56,4 +57,11 @@ html_static_path = ['_static']
 html_theme_options = {
     'use_fullscreen_button': False,
     'use_issues_button': False,
+    'repository_url': 'https://github.com/numbas/behind-the-design-of-numbas',
+    'repository_branch': 'main',
+    'use_repository_button': True,
+    'use_edit_page_button': True,
+    'path_to_docs': 'source/',
 }
+
+highlight_language = 'none'
