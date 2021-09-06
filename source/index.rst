@@ -5,7 +5,7 @@ This site collects articles by the Numbas team on the motivations and research b
 
 .. toctree::
     :maxdepth: 1
-    :caption: Fluffy topics:
+    :caption: Fluffy topics
 
     feedback
     editing
@@ -28,3 +28,8 @@ This site collects articles by the Numbas team on the motivations and research b
     alternative-answers
     adaptive-marking
     pattern-matching
+
+.. toctree::
+    :caption: Other stuff
+
+    bibliography

@@ -29,7 +29,10 @@ author = 'Christian Lawson-Perfect'
 # ones.
 extensions = [
     'pagestatus',
+    'sphinxcontrib.bibtex',
 ]
+
+bibtex_bibfiles = ['references.bib']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -53,6 +56,7 @@ html_title = project
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_css_files = ['custom.css']
 
 html_theme_options = {
     'use_fullscreen_button': False,
