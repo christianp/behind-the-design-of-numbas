@@ -100,6 +100,6 @@ Still much to do.
 Previous work
 -------------
 
-See :cite:t:`sangwin`.
+:cite:`sangwincaabook`.
 
 `whystartat.xyz <https://whystartat.xyz>`_

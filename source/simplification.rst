@@ -18,7 +18,11 @@ Rewrite rules defined using :ref:`pattern-matching`.
 
 Configurable sets of rules.
 
+Repeatedly apply rules until none match.
+
+Need to ensure that there are no loops - the simplification process converges.
+
 Previous work
 -------------
 
-Sangwin's book
+:cite:`sangwincaabook`.
