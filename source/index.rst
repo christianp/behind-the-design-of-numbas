@@ -28,6 +28,7 @@ This site collects articles by the Numbas team on the motivations and research b
     alternative-answers
     adaptive-marking
     pattern-matching
+    themes
 
 .. toctree::
     :caption: Other stuff
