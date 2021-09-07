@@ -37,7 +37,7 @@ They can have:
 
 * An availability condition, depending on the student's answer, score, whether an answer has been submitted yet.
 
-* A list of variable replacements to make when making the next part, based using the current variables and the student's answer.
+* A list of variable replacements to make when making the next part, using the current variables, the student's answer, and the values of marking algorithm notes.
 
 * A penalty to apply for choosing this option.
 
@@ -53,4 +53,15 @@ The loop is as follows:
 
 * When the student selects a next part, apply any penalty and create a new set of variables using the defined replacements.
 
+Scoring is tricky: you might be able to visit a part which awards marks arbitrarily often, so if the score for the question is just the sum of the scores for the parts, then the maximum score is unlimited.
 
+Instead, each part feeds into a named *objective*, with a fixed limit on its total score.
+Penalties are also named, with a maximum on each.
+The score for the question is the sum of the objectives' scores, minus the sum of the penalties.
+This helps to explain the marking to the student: their score is broken down into, for example, "identify critical points"; "classify solution" and so on.
+
+Navigation might be difficult: if a student goes down a long optional path, we need to make sure they can go back.
+The default theme displays breadcrumbs at the top of the question, and each part can optionally show a "go back to the previous part" link.
+
+The "end" of the question is not well-defined: there might be more paths that the student could have taken.
+It's up to the question author to tell the student when they're done.

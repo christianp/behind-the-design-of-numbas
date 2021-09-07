@@ -16,7 +16,7 @@ help:
 
 .PHONY: help Makefile
 
-upload: html
+upload: clean html
 	rsync -zr build/html/ $(REMOTE_LOCATION)
 
 # Catch-all target: route all unknown targets to Sphinx using the new

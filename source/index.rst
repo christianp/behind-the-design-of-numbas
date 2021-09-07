@@ -7,15 +7,18 @@ This site collects articles by the Numbas team on the motivations and research b
     :maxdepth: 1
     :caption: Fluffy topics
 
+    motivating-principles
     feedback
     editing
     randomisation
     extension
-    notation
+    mathematical-notation
+    number-notation
     simplification
     interaction
     organisation
     writing-style
+    unusual-kinds-of-answer
 
 .. toctree::
     :maxdepth: 1
