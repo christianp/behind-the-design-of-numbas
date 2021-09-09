@@ -3,3 +3,8 @@
     --pst-font-size-base: 17px;
 }
 
+code {
+    background: #eee;
+    padding: 0 0.5em;
+    border-radius: 0.4em;
+}

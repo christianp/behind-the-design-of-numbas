@@ -28,9 +28,12 @@ author = 'Christian Lawson-Perfect'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx.ext.todo',
     'pagestatus',
     'sphinxcontrib.bibtex',
 ]
+
+todo_include_todos = True
 
 bibtex_bibfiles = ['references.bib']
 
