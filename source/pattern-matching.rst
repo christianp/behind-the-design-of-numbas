@@ -84,7 +84,7 @@ Once you've got pattern-matching and rewriting, you can do lots of things:
 Rewriting an expression
 #######################
 
-To define a rewriting rule, we need a :defn:`pattern` that the expression must match and a :defn:`result` expression, which might have parts of the matched expression substituted into it.
+To define a rewriting rule, we need a :dfn:`pattern` that the expression must match and a :dfn:`result` expression, which might have parts of the matched expression substituted into it.
 
 If the language for patterns is not expressive enough, there could be combinatorial explosion in the number of rules that must be defined.
 (But a more expressive pattern language could lead to combinatorial explosion in the algorithm's running time).
