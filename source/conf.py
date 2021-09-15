@@ -13,7 +13,6 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../extensions'))
-print(sys.path)
 
 # -- Project information -----------------------------------------------------
 
@@ -31,6 +30,7 @@ extensions = [
     'sphinx.ext.todo',
     'pagestatus',
     'sphinxcontrib.bibtex',
+    'sphinxcontrib.proof',
 ]
 
 todo_include_todos = True

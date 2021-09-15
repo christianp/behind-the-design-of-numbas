@@ -4,9 +4,7 @@ Pattern-matching mathematical expressions
 =========================================
 
 .. page_status::
-    :kind: in-progress
-
-https://www.overleaf.com/project/5b92712d47e18a0f04cc4763
+    :kind: draft
 
 Problem
 -------
@@ -20,19 +18,6 @@ feedback, different forms of algebraically equivalent expressions must
 be described in some general way; to simplify an expression, a rewriting
 rule must recognise expressions in a certain form and identify
 particular sub-expressions to produce a new form.
-
-Things we want:
-
--  Match any sub-expression.
-
--  Consider all terms of an associative operation together, e.g. terms
-   in a sum, joined by :math:`+` or :math:`-`.
-
--  Match if a subset of the terms match the given pattern, leaving the other terms unmatched.
-
--  Accept several different forms with the same rule, to avoid
-   repetition, e.g. :math:`x+By` is a special case of :math:`Ax+By` with
-   :math:`A=1`.
 
 Pattern-matching on trees is not as simple as on strings.
 
@@ -51,7 +36,7 @@ pattern-matching system should know about and take into account.
 So, we need a pattern-matching system which operates on mathematical
 expressions with all of their structure, not strings.
 This isn't a new idea: most computer algebra systems, such as Mathematica and Maple, are
-fundamentally pattern-matching and rewriting systems.
+fundamentally pattern-matching and term-rewriting systems.
 
 The problem is that how the algorithms in those systems work on a
 technical level isn't well documented, and because Numbas runs entirely
@@ -65,104 +50,274 @@ I've spent the time since then implementing the system, and in using it
 I came up with some more features that greatly widened the range of
 possible uses.
 
+Things we want:
 
-What is the right way to define a rewriting rule?
+- Consider all terms of an associative operation together, e.g. terms
+  in a sum, joined by :math:`+` or :math:`-`.
 
-Match pattern → identify terms matched against parts of the pattern → write a new expression.
+- Match if a subset of the terms match the given pattern, leaving the other terms unmatched.
 
-Want to avoid combinatorial explosion in the number of rules that must be defined (the algorithm might have exponential running time, though)
+- Accept several different forms with the same rule, to avoid
+  repetition, e.g. :math:`x+By` is a special case of :math:`Ax+By` with
+  :math:`A=1`.
 
-Need built-in matchers for common things, e.g. rational polynomials, complex numbers in Cartesian or polar form.
+- It would be nice to have built-in matchers for common non-atomic objects, e.g. rational polynomials, complex numbers in Cartesian or polar form, diagonal matrices.
 
-Associativity and commutativity of operations/terms sometimes matter, and sometimes don't.
+- A fairly readable (and writable) syntax for defining patterns which match expressions.
 
-Quantifiers are complicated.
+  It doesn't need to make immediate sense, but shouldn't be too complicated:
+  regular expressions don't make sense to someone who hasn't seen them
+  before, but there are very few things to learn.
 
-How to capture a missing term with a default value?
+- Capture a missing term with a default value.
 
-How do you combine terms that are captured more than once?
+- Identify equivalent terms that appear in more than one place, for collecting or cancelling.
 
-Back-references would allow you to identify terms that should cancel, such as common factors/denominators.
-But "back-reference" isn't well-defined when terms commute.
+Once you've got pattern-matching and rewriting, you can do lots of things:
 
-For the rewriting step, must be able to evaluate a captured term to an object that you can do arithmetic with.
+* Check the form of an answer.
+* Simplify expressions.
+* Symbolic differentiation and integration.
+* Obtain canonical forms for (some classes of) expressions.
+* Other CAS techniques.
 
-Come up with a fairly readable (and writable) syntax for defining
-patterns which match expressions.
+Rewriting an expression
+#######################
 
-Doesn't need to make immediate sense, but shouldn't be too complicated:
-regular expressions don't make sense to someone who hasn't seen them
-before, but there are very few things to learn.
+To define a rewriting rule, we need a :defn:`pattern` that the expression must match and a :defn:`result` expression, which might have parts of the matched expression substituted into it.
 
-Should be easy to diagram how it matches, like railway diagrams for
-regular expressions.
+If the language for patterns is not expressive enough, there could be combinatorial explosion in the number of rules that must be defined.
+(But a more expressive pattern language could lead to combinatorial explosion in the algorithm's running time).
 
-Need a lot of new symbols for quantifiers, conjunctions and atoms.
+Rewriting rules should ignore parts of the expression that remain unchanged, and keep them roughly where they were in the rewritten expression.
 
-I originally had lots of functions of the form ``m_X``, which led to
-quite long and hard-to-read patterns.
-Operators are a lot easier to read, especially the postfix quantifiers which look more like regex
-quantifiers.
+It must be possible to evaluate a captured term to an object that you can do arithmetic with, for example collecting together constant terms.
 
-Once you've got pattern-matching, you can do lots of things:
+It's often much easier to use several rules together, rather than writing one rule which does everything.
+For example, when simplifying the fraction :math:`\frac{18}{6}`, one rule could first cancel the common factor to obtain :math:`\frac{3}{1}`, and then another rule could remove the denominator :math:`1` to obtain :math:`3`.
 
-* Check the form of an answer
-* Symbolic differentiation and integration
-* Canonical forms for (some classes of) expressions
-* Other CAS techniques
+Examples
+~~~~~~~~
+
+* Take negation out of a fraction: 
+
+  :math:`\frac{-x}{y}` becomes :math:`- \frac{x}{y}`.
+
+* Collect constants: 
+
+  :math:`1 + x + 3` becomes :math:`x + 4`.
+
+* Collect coefficients of arbitrary terms: 
+
+  :math:`5 \times (x + \sin(z)) - 3 \times (x+\sin(z))` becomes :math:`2 \times (x+\sin(z))`.
+
+* Remove terms with a factor of zero: 
+
+  :math:`\cos(t) + 0 \times e^{5t} + z` becomes :math:`\cos(t) + z`.
+
+* Simplify square roots of square numbers: 
+
+  :math:`\sqrt{16}` becomes :math:`4`, but :math:`\sqrt{3}` is unchanged.
+
+* Apply trigonometric identities: 
+
+  :math:`\cos(\pi/2)` becomes :math:`0`, :math:`\sin(3\pi/2)` becomes :math:`-1`, but :math:`\sin(0.34 \pi)` is unchanged.
+
+* Cancel common factors on the top and bottom of a fraction: 
+
+  :math:`\displaystyle \frac{4 \, a^2 \, b \, c}{6 \, a \, b}` becomes :math:`\displaystyle \frac{2 \, a \, c}{3}`.
+
+* Extract a scalar factor from the elements of a matrix: 
+
+  :math:`\begin{pmatrix} 2\lambda & 0 \\ 0 & - \lambda \, x \end{pmatrix}`` becomes :math:`\lambda \begin{pmatrix} 2 & 0 \\ 0 & -x \end{pmatrix}`.
 
 Determining the form of an expression
 #####################################
 
-In a 'mathematical expression' question, the student's answer
-:math:`f_{\mathrm{S}}` is an algebraic expression which must match the
-teacher's expected answer :math:`f_{\mathrm{T}}`.
-We can numerically establish that the student has given an equivalent expression by substituting values
-for :math:`x` into both :math:`f_{\mathrm{S}}` and
-:math:`f_{\mathrm{T}}`, but this tells us nothing about the *form* of
-:math:`f_{\mathrm{S}}`.
+In a 'mathematical expression' question, the student's answer :math:`S` is an algebraic expression which must match the teacher's expected answer :math:`T`.
+
+We can numerically establish that the student has given an equivalent expression by substituting values for :math:`x` into both :math:`S` and :math:`T`, but this tells us nothing about the *form* of :math:`S`.
+
+Often, valid forms of answer to a particular question differ substantially from each other.
+The order of terms in a sequence of commuting operations usually doesn't matter, and some terms may be optional or not present in some randomisations of the question.
 
 Examples
 ~~~~~~~~
 
 * The student must expand :math:`(x+\alpha)(x+\beta)`.
+
   The expanded expression will be of the form :math:`x^2+Ax+B`.
+
   Necessary conditions for 'expanded' include 'contains no brackets', and 'each term
   is an integer multiplied by a power of :math:`x`'.
+
+  The :math:`x` and constant terms might be omitted.
+
+  If the coefficient :math:`A = 1`, it can be omitted.
   
   The opposite task, factorise :math:`x^2+Ax+B`, will produce an
   expression of the form :math:`(x+\alpha)(x+\beta)`.
+
   A condition for 'factorised' is 'the expression is a product of irreducible
   polynomials'.
 
-* Write a complex number in argument-modulus form, :math:`re^{i\theta}` - :math:`r` and :math:`\theta` could be literal real numbers, or expressions producing real numbers.
+* Write a complex number in argument-modulus form, :math:`r\,e^{i\theta}` - :math:`r` and :math:`\theta` could be literal real numbers, or expressions producing real numbers.
 
-Algorithm
+  If either of :math:`r` or :math:`\theta` are :math:`1`, they can be omitted.
+  
+  If :math:`\theta = 0`, then the whole exponent could be written as :math:`e^0`, :math:`1`, or omitted entirely.
+
+  Some complex numbers in argument-modulus form:
+
+  * :math:`5e^{-2i}`
+
+  * :math:`5e^{3i}`
+
+  * :math:`e^i`
+
+  * :math:`(1+\sqrt{2})e^{\frac{\pi}{2}i}`
+
+  * :math:`1.32445e^0`
+
+  * :math:`1`
+
+Previous work
+-------------
+
+WeBWorK
+#######
+
+WeBWorK uses `'bizarro
+arithmetic' <https://github.com/openwebwork/pg/blob/8a089edceb5d3b36500bac47ef3c2daeec10e0e4/macros/bizarroArithmetic.pl>`__
+to force expressions which would be equivalent in standard arithmetic to
+be non-equivalent.
+It then uses the trick of evaluating at randomly chosen points to establish equivalence.
+Still unable to give reliable feedback on the form of the student's answer.
+Quite a lot of work to set it all up (add flags to context, etc.)
+
+`limitedFactor
+context <https://github.com/openwebwork/webwork-open-problem-library/blob/master/OpenProblemLibrary/macros/PCC/contextLimitedFactor.pl>`__
+
+`bizarro math for sine and
+cosine <http://webwork.maa.org/moodle/mod/forum/discuss.php?d=4434>`__ -
+Davide suggests directly inspecting the Formula object to test if it's
+of the form :math:`\sin(\cdot)`.
+
+`Adaptive parameters <http://webwork.maa.org/wiki/AdaptiveParameters>`__
+try to allow for free variables which change the value of an expression
+linearly, i.e.
+:math:`Af(x) + B` instead of :math:`f(x)`.
+Another randomised algorithm is used to establish how the parameters affect the expression, as a matrix - pick some random values for the parameters,
+and solve the resulting system of equations.
+
+Prolog
+######
+
+(Because Chris Sangwin told me to look at it).
+
+Prolog uses a variant of the
+`Martelli-Montanari <http://www.nsl.com/misc/papers/martelli-montanari.pdf>`__
+unification algorithm to identify values of free variables on either
+side of an equation so that they are equivalent.
+
+It doesn't allow for missing values, or alternate forms in one
+expression - you'd have to give an equation for each form.
+
+STACK
+#####
+
+`STACK <https://stack-assessment.org/>`__ has a few answer tests to do with the form of the student's
+answer: LowestTerms, Expanded, FacForm, SingleFrac, PartFrac,
+CompletedSquare.
+
+For anything else, you can apply simplification rules to expressions
+before comparing - the two expressions should end up exactly equal after
+simplifying.
+
+Maxima
+######
+
+`Maxima <https://maxima.sourceforge.io/>`__ deals with everything as S-expressions, and seems to require
+quite a lot of code to add new rules.
+
+expreduce, Mathics, Mathematica
+###############################
+
+`expreduce <https://github.com/corywalker/expreduce>`__ is a project in Go. 
+Inspired by Mathics, but some syntax differences.
+
+`A video by Brian
+Beckman <https://www.youtube.com/watch?v=S2OEPFbsl50>`__ about how term
+rewriting in the style of Mathematica works.
+`Jacquard <https://archive.codeplex.com/?p=jacquard>`__ is a JavaScript
+clone of Mathematica's syntax.
+
+`Mathics
+pattern-matching <https://mathics.angusgriffith.com/doc/reference-of-built-in-symbols/patterns-and-rules/>`__
+seems to have many of the same operators I've come up with.
+Turns out it's basically a clone of Mathematica.
+
+`Mathematica <https://reference.wolfram.com/language/tutorial/PatternsAndTransformationRules.html>`__\ 's
+functionality is similar to what I came up with.
+
+Maple
+#####
+
+`Maple's pattern matching
+commands <https://www.maplesoft.com/support/help/maple/view.aspx?path=examples/patmatch>`__
+don't look as sophisticated as Mathematica, but there are some
+shorthands for common patterns: algebraic, linear, multilinear.
+
+Matchpy
+#######
+
+`Matchpy <https://matchpy.readthedocs.io>`__ is a library for pattern-matching symbolic expressions in Python.
+
+It seems to be inspired by Mathematica, and isn't very sophisticated at the moment.
+
+It has a "many-to-one "matcher which tries to match an expression against several patterns at once.
+Where patterns are similar, it only needs to check once.
+Could this be modelled with a nondeterministic finite state automaton?
+
+Rewriting rules are implemented as patterns, with a Python function whose parameters are the captured names, returning a transformed expression.
+
+Rubi
+####
+
+`Rubi <http://www.apmaths.uwo.ca/%7Earich/>`__ symbolically integrates.
+
+It's a collection of rewriting rules, first implemented in Mathematica and later ported to other computer algebra systems.
+
+Solution
 ---------
 
-.. todo::
+To define patterns, I added several new symbols to the JME language, for quantifiers, conjunctions and atoms.
 
-    Examples
+I originally had lots of functions of the form ``m_X``, which led to quite long and hard-to-read patterns.
+Operators are a lot easier to read, especially the postfix quantifiers which look more like regex
+quantifiers, e.g. ``x `?`` rather than ``m_maybe(x)``.
 
-.. todo::
-
-    Stuff that doesn't work right at the moment:
-
-    * Combining names that are captured in more than one place.
+The :ref:`pattern-matching algorithm <matching-a-pattern>` takes a pattern written with these operators and an input expression, and decides if there's a match, producing a collection of captured parts analogous to regular expression capturing groups.
 
 Similarities with regular expressions.
 ######################################
 
-Similarities: quantifiers, choice.
+The matching algorithm is backtracking, like many implementations of regular expression matchers.
+When there is a choice to make, due to a quantifier or the order of terms, the matcher can backtrack and make a different choice if one path turns out not to lead to a match.
 
-Differences: and, condition.
+Quantifiers allow arbitrarily many similar terms to be captured without repetition in the pattern.
 
-Do we need positive/negative lookahead/lookbehind?
+The ```&`` operator for specifying two patterns that an expression must match is analogous to positive lookahead in regular expressions.
+
+Unlike most regular expression matchers, patterns can specify arbitrarily complicated conditions on parts of the expression in the middle of the matching process. 
+For example, a regular expression can't test that a number is prime in one pass.
 
 Syntax trees
 ############
 
 A string representing a mathematical expression or pattern is parsed into a syntax tree.
+
+The pattern-matcher operates on these trees.
 
 .. class:: Tree
 
@@ -182,6 +337,42 @@ A string representing a mathematical expression or pattern is parsed into a synt
                 variable x
             number 1
 
+.. _pattern-matching-options:
+
+Options
+#######
+
+Commutative
+    When matching terms joined by a commutative operation
+    such as :math:`\times` or :math:`+`, match terms in any order.
+
+Associative
+    When matching terms joined by an associative operation,
+    collect as many terms as possible to match at once, instead of just
+    the two subtrees of the first application of the operation. 
+    e.g., :math:`(a+b)+c` is matched as a list of three terms :math:`a`,
+    :math:`b`, :math:`c`, not two terms :math:`a+b` and :math:`c`.
+
+Allow other terms
+    Match a sequence of terms where the pattern is
+    satisfied by a subset of the terms. e.g., :math:`1+2+x` matches
+    ``n +n`` - the extra :math:`x` is ignored.
+    In a non-commutative match, the pattern must match a contiguous subsequence of the terms.
+
+Strict inverse
+    If turned off, ``x-y`` will be considered as
+    ``x+(-y)``, so will match patterns like ``?+?``.
+
+    Similar for ``x/y`` being interpreted as ``x*(/y)``.
+    If turned on, plus means plus!
+
+Gather as a sequence
+    If turned off, then multiple terms matched under the same name will be stored in a list.
+    
+    If turned on, then they will be captured as a sequence of terms joined by the same operator used to find them, e.g. addition or multiplication.
+
+.. _matching-a-pattern:
+
 Matching a pattern
 ##################
 
@@ -193,6 +384,9 @@ Matching a pattern
     Its behaviour depends on the type of the token at the top of ``ruleTree``:
 
     * A capturing operator: the rule must be of the form ``subRule ; name`` - if ``exprTree`` matches ``subRule``, then capture it under ``name``.
+
+    * An :dfn:`identified capturing` operator: the rule must be of the form ``subRule ;= name``.
+      All parts of the expression that are captured under this name must be equal.
 
     * A name: use :func:`matchName`.
 
@@ -221,17 +415,7 @@ Matching a pattern
     * ``?`` - matches any expression.
 
     * ``$n`` - matches a literal number.
-      Annotations can specify extra conditions, or match other kinds of numbers, such as fractions or complex numbers:
-
-        * ``complex``
-        * ``imaginary``
-        * ``real``
-        * ``positive``
-        * ``nonnegative``
-        * ``negative``
-        * ``integer``
-        * ``decimal``
-        * ``rational``
+      Annotations on this can specify extra conditions, or match other kinds of numbers, such as fractions or complex numbers.
 
     * ``$v`` - matches any variable name.
 
@@ -283,11 +467,10 @@ Matching a pattern
     Otherwise, match an ordinary operator:
 
     The operator being matched is the operator at the top of ``ruleTree``.
-    tree.
 
-    The match is 'commutative' if the commutative :ref:`option <pattern-matching-options>` is turned on and the operator is commutative.
+    The match is :dfn:`commutative` if the commutative :ref:`option <pattern-matching-options>` is turned on and the operator is commutative.
 
-    The match is 'associative' if the associative :ref:`option <pattern-matching-options>` is turned on and the operator is associative.
+    The match is :dfn:`associative` if the associative :ref:`option <pattern-matching-options>` is turned on and the operator is associative.
 
     Run :func:`getTerms` to identify terms in ``ruleTree`` and ``exprTree``.
 
@@ -303,7 +486,6 @@ Matching a pattern
     When gathering multiplicative terms as a sequence, the invented unary reciprocal operator must be removed: replace each instance of ``x*(/y)`` with ``x/y``.
     
     Capture the operator token under the name ``__op__``, to be used by a rewriting rule if there are unmatched terms in the sequence.
-
 
     The special matching operators specify quantifiers, allow for plus/minus or times/divide matches, or express combinations of patterns:
 
@@ -361,9 +543,11 @@ Matching a pattern
 
     Each matched name is captured as a list with an entry for each time the name was matched.
 
-.. function:: matchToken(ruleTree, exprTree);
+.. function:: matchToken(ruleTree, exprTree)
 
     There is a match if the tokens at the top of ``ruleTree`` and ``exprTree`` are equal.
+
+.. _match-sequence:
 
 Matching a sequence of terms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -374,14 +558,21 @@ Both the pattern and the expression being matched produce a sequence of terms.
 The aim is to match up terms in the pattern with terms in the expression.
 Quantifiers on each term in the pattern specify how many terms in the expression can match against it.
 
-The same :class:`Term` class is used for terms in both the pattern and the expression.
-Terms in the expression only fill in the ``term`` property.
+To identify a sequence, we might need to apply the law of associativity for binary operations.
+
+When matching a sequence pattern we might need to apply the law of commutativity, to match terms which appear in a different order to that used in the pattern.
+
+It's convenient when matching sums or products of terms to treat ``x-y`` as ``x+(-y)`` and ``x/y`` as ``x*(/y)``.
+There's no conventional symbol for a unary "reciprocal" operator analogous to the unary "negation" operator, but it's useful here.
 
 .. class:: Term(tree)
 
     A ``Term`` objects represents a single term in a sequence.
 
-    .. property:: term 
+    The same :class:`Term` class is used for terms in both the pattern and the expression.
+    Terms in the expression only fill in the ``tree`` property; the rest of the defined properties are only for terms in the pattern.
+
+    .. property:: tree
         :type: Tree
 
         The syntax tree corresponding to this term, with the outermost quantifiers, default value operators, or capturing operators removed.
@@ -420,26 +611,29 @@ Terms in the expression only fill in the ``term`` property.
 
     Quantifiers are pulled through unary operations, so ``-(x`?)`` is equivalent to ``(-x)`?``.
 
-    * ``;`` - add a name to ``names``.
+    ``;``
+      Add a name to ``names``.
 
-    * ``;=`` - add a name to ``names``, and also add it to ``outside_equalnames`` if a quantifier has not been encountered yet, or ``inside_equalnames`` otherwise.
+    ``;=``
+      Add a name to ``names``, and also add it to ``outside_equalnames`` if a quantifier has not been encountered yet, or ``inside_equalnames`` otherwise.
 
-    * ```?``, ```*`` or ```+`` - change ``quantifier``.
+    ```?``, ```*`` or ```+``
+      Change ``quantifier``.
 
       There are precedence relations between the current value of ``quantifier`` and the one being unpeeled:
-
+  
       * ``0`` takes precedence over all others.
       * ``1`` has the lowest precedence.
       * ```?`` followed by ```*`` or ```+``, or the other way round, produce ```*``.
       * Otherwise, the new quantifier takes precedence.
-
-    * ```:`` - set ``defaultValue``.
-
+  
+      ```:`` - set ``defaultValue``.
+  
       If ``quantifier`` is ``1``, change it to ```?``.
       If it's ```+``, change it to ```*``.
       (Implicitly, this term is optional)
 
-    Once these operators have been peeled off, the remaining tree is saved as the ``term`` property.
+    Once these operators have been peeled off, the remaining tree is saved as the ``tree`` property.
 
     Finally, any more identified capturing operators ``;=`` inside the tree are found and saved.
     Those under a quantifier are ignored.
@@ -449,200 +643,192 @@ Terms in the expression only fill in the ``term`` property.
 
     Given a ``tree`` representing a series of terms ``t1 op t_2 op t_3 op ... op t_n``, return the terms as a list of :class:`Term` objects.
 
+    * If the top of the tree is a unary minus operation, move it inside the tree so that it applies to the leftmost factor.
+      For example, rewrite ``-((x*y)*z)`` to ``((-x)*y)*z``.
 
-    .. code-block:: javascript
+    * If the "Strict inverse" :ref:`option <pattern-matching-options>` is not turned on, and ``op`` is ``+`` or ``*``, then replace ``x-y`` with ``x+(-y)`` and ``x/y`` with ``x*(/y)``.
 
-        /** Options for {@link Numbas.jme.rules.getTerms}.
-         *
-         * @typedef Numbas.jme.rules.getTerms_options
-         * @type {object}
-         * @property {boolean} commutative - Should the operator be considered as commutative, for the purposes of matching ops with opposites? If yes, `a>c` will produce terms `c` and `a` when `op='<'`.
-         * @property {boolean} associative - Should the operator be considered as associative? If yes, `(a+b)+c` will produce three terms `a`,`b` and `c`. If no, it will produce two terms, `(a+b)` and `c`.
-         * @property {boolean} strictInverse - If `false`, `a-b` will be interpreted as `a+(-b)` when finding additive terms.
-         */
+    * If ``op`` is a binary relation, then we want to make sure that the operation and its converse are handled together.
+      For example, ``>`` is the converse of ``<``.
+      If ``op`` is ``<``, then replace all instances in the tree of ``a > b`` with ``b < a``.
 
-        /** Information to do with a term found in an expression by {@link Numbas.jme.rules.getTerms}.
-         *
-         * @typedef Numbas.jme.rules.term
-         * @type {object}
-         * @property {Numbas.jme.tree} term
-         * @property {Array.<string>} names - Names captured by this term.
-         * @property {Array.<string>} equalnames - Identified names captured by this term.
-         * @property {string} quantifier - Code describing how many times the term can appear, if it's a pattern term.
-         * @property {number} min - The minimum number of times the term must appear.
-         * @property {number} max - The maximum number of times the term can appear.
-         * @property {Numbas.jme.tree} defaultValue - A value to use if this term is missing.
-         */
+    * If the token at the top of the tree is the operator ``op``, then ``args`` is the list of arguments.
+      Otherwise, ``args`` is the list whose only element is ``tree``.
 
-        /** Replacements to make when identifying terms in a sequence of applications of a given op.
-         * When looking for terms joined by `op`, `nonStrictReplacements[op]` is a list of objects with keys `op` and `replacement`. 
-         * A tree `A op B` should be replaced with `replacement(tree)`.
-         * For example, `x-y` should be rewritten to `x+(-y)`.
-         */
-        var nonStrictReplacements = {
-            '+': {
-                '-': function(tree) {
-                    return {tok: new jme.types.TOp('+',false,false,2,true,true), args: [tree.args[0],insertUnaryMinus(tree.args[1])]};
-                }
-            },
-            '*': { 
-                '/': function(tree) {
-                    tree = {tok: new jme.types.TOp('*',false,false,2,true,true), args: [tree.args[0],{tok:new jme.types.TOp('/u',false,true,1,false,false),args:[tree.args[1]]}]};
-                    return tree;
-                }
-            }
-        };
+    * For each argument ``arg`` in ``args``:
 
-        /** Dictionary of 'canonical' ops to match in non-strict mode.
-         * For example, `a-b` will be matched as `a+(-b)`.
-         */
-        var nonStrictCanonicalOps = {
-            '-': '+',
-            '/': '*'
-        }
+      * Make a :class:`Term` object ``term`` containing ``arg``.
 
-        /** Insert a unary minus in this tree.
-         * If it's a product, the minus applies to the leftmost factor.
-         *
-         * @param {Numbas.jme.tree} tree
-         * @returns {Numbas.jme.tree}
-         */
-        function insertUnaryMinus(tree) {
-            if(jme.isOp(tree.tok,'*')) {
-                return {tok: tree.tok, args: [insertUnaryMinus(tree.args[0]),tree.args[1]]};
-            } else if(jme.isOp(tree.tok,'/')) {
-                return {tok: tree.tok, args: [insertUnaryMinus(tree.args[0]),tree.args[1]]};
-            } else {
-                return {tok: new jme.types.TOp('-u',false,true,1,false,false), args: [tree]};
-            }
-        }
+      * Remove any capturing operators ``;`` or ``;=`` from the top of ``arg``.
 
-        /** Given a tree representing a series of terms t1 <op> t2 <op> t3 <op> ..., return the terms as a list.
-         *
-         * @memberof Numbas.jme.rules
-         * @param {Numbas.jme.tree} tree - The tree to find terms in.
-         * @param {string} op - The name of the operator whose terms are to be found.
-         * @param {Numbas.jme.rules.getTerms_options} options
-         * @param {boolean} calculate_minimum - Should the minimum allowed number of occurrences of each term be calculated? This is a pre-process step when getting the terms in a pattern expression.
-         * @returns {Array.<Numbas.jme.rules.term>}
-         */
-        var getTerms = Numbas.jme.rules.getTerms = function(tree,op,options,calculate_minimum) {
-            /** Add the list of existing names passed in at the start to each term.
-             *
-             * @param {Array.<Numbas.jme.rules.term>} items
-             * @param {Array.<Numbas.jme.tree>} existing_names - Names captured higher up the tree.
-             * @param {Array.<Numbas.jme.tree>} existing_equal_names - Identified names captured higher up the tree.
-             * @returns {Array.<Numbas.jme.rules.term>}
-             */
-            function add_existing_names(items,existing_names,existing_equal_names) {
-                return existing_names.length==0 && existing_equal_names.length==0 ? items : items.map(function(item) {
-                    return {
-                        term: item.term, 
-                        names: existing_names.concat(item.names),
-                        inside_equalnames: item.inside_equalnames,
-                        outside_equalnames: existing_equal_names.concat(item.outside_equalnames),
-                        quantifier: item.quantifier, 
-                        min: item.min, 
-                        max: item.max,
-                        defaultValue: item.defaultValue,
-                    };
-                });
-            }
+      * If ``op`` is ``*`` and the token at the top of ``arg`` is a unary minus, then remove that (the :class:`Term` object will remember that it's there).
 
-            // we'll cache the results of this call in the tree object, to save time if the same thing is asked for again
-            var intree = tree;
-            if(intree.terms === undefined) {
-                intree.terms = {};
-            }
-            if(intree.terms[op] === undefined) {
-                intree.terms[op] = {};
-            }
-            var option_signature = options.associative*2 + (options.strictInverse);
+      * If using associativity and the token at the top of ``arg`` is the operator ``op``, then split it into more terms:
 
-            if(intree.terms[op][option_signature]) {
-                return intree.terms[op][option_signature];
-            }
+        * Run :func:`getTerms` on ``arg`` to obtain a list of terms.
+
+        * Add the captured names from ``item`` to each of these terms.
+
+        * If the ``quantifier`` for ``item`` is not ``1``, then combine the quantifiers on each of these terms, using the same logic as used when constructing :class:`Term` objects.
+          For example, ``(x`+ * y)`?`` is equivalent to ``x`* * y`?``.
+
+        * Add each of these terms to the list of terms to output.
+
+        Otherwise, add ``term`` to the list of terms to output.
+
+      * Return the list of identified terms.
 
 
-            if(jme.isOp(tree.tok,'-u') && op=='*') {
-                tree = insertUnaryMinus(tree.args[0]);
-            }
+.. function:: matchTermSequence(ruleTerms, exprTerms, options)
 
-            if(!options.strictInverse && op in nonStrictReplacements) {
-                for(var subop in nonStrictReplacements[op]) {
-                    if(jme.isOp(tree.tok,subop)) {
-                        tree = nonStrictReplacements[op][subop](tree);
-                    }
-                };
-            }
+    Given a list of rule terms and a list of expression terms, try to come up with an assignment of expression terms to rule terms.
 
-            /** Is the given token the op we're looking for?
-             * True if it's literally that operator, it's the converse of that operator, or it would be replaced to that op in non-strict mode.
-             *
-             * @param {Numbas.jme.token} tok
-             * @returns {boolean}
-             */
-            function isThisOp(tok) {
-                if(jme.isOp(tok,op)) {
-                    return true;
-                }
-                if(options.commutative && jme.converseOps[op] && jme.isOp(tok,jme.converseOps[op])) {
-                    return true;
-                }
-                if(!options.strictInverse && op in nonStrictReplacements && tok.type=='op' && tok.name in nonStrictReplacements[op]) {
-                    return true;
-                }
-            }
+    A rule term might match more than one expression term, if quantifiers allow.
 
-            var args = jme.isOp(tree.tok,op) ? tree.args : [tree];
-            if(options.commutative && jme.converseOps[op] && jme.isOp(tree.tok,jme.converseOps[op])) {
-                args = tree.args.slice().reverse();
-            }
+    An expression term might not match any rule terms, if the "Allow other terms" :ref:`option <pattern-matching-options>` is turned on.
+    In order to allow rewriting rules to keep terms in roughly the same order, we track whether unmatched expression terms are towards the start or the end of the expression.
 
-            var terms = [];
+    Keep track of what names have been matched for each term in the expression.
 
-            for(var i=0; i<args.length;i++) {
-                var arg = args[i];
-                var item = new Term(arg);
-                var res = unwrapCapture(arg);
-                var argtok = res.tree.tok;
-                if(op=='*' && jme.isOp(argtok,'-u')) {
-                    argtok = unwrapCapture(args[i].args[0]).tree.tok;
-                }
-                if(options.associative && (isThisOp(argtok) || (!options.strictInverse && op=='+' && jme.isOp(argtok,'-')))) {
-                    var sub = getTerms(res.tree,op,options,false);
-                    sub = add_existing_names(sub,item.names,item.outside_equalnames);
-                    if(item.quantifier!='1') {
-                        sub = sub.map(function(t){ t.quantifier = quantifier_combo[t.quantifier][item.quantifier]; });
-                    }
-                    terms = terms.concat(sub);
-                } else {
-                    if(item.max>0) {
-                        terms.push(item);
-                    }
-                }
-            }
+    An expression term ``exprTerm`` matches a rule term ``ruleTerm`` if :func:`matchTree(exprTerm.tree, ruleTerm.tree)` returns ``true``.
 
-            if(calculate_minimum) {
-                terms.min_total = 0;
-                terms.forEach(function(t) {
-                    terms.min_total += t.min;
-                });
-            }
+    An assignment is valid if, for each identified name captured in an
+    expression term, it's equal to all matches of the
+    name in previous terms.
 
-            intree.terms[op][option_signature] = terms;
-            return terms;
-        }
+    There might be more than one valid matching of expression terms to rule terms: an expression term could match several rule terms, and a rule term might have a quantifier that allows it to match different numbers of expression terms.
+    If "Allow other terms" is turned on, then for each expression term we could decide not to try to match it at all.
 
+    The strategy is to move the input pointer along the list of expression terms, trying to match them greedily with the first rule term they match against.
+    If either pointer reaches the end of the corresponding list and there are any unmatched terms, then backtrack, either looking to match an expression term against a later rule, or if "Allow other terms" is turned on, don't match it at all.
 
+    When the "Commutative" :ref:`option <pattern-matching-options>` is turned on, there are lots more possible matches, increasing the maximum running time of the algorithm.
+
+    The process of finding a match works as follows.
+
+    Define:
+
+    ``capture`` 
+      A list storing which pattern term each expression term is matched against.
+      Values are either an index in the list ``ruleTerms`` or the constants ``UNCAPTURED``, ``START`` or ``END``, denoting a term that did not match a rule term, not captured, at the start of the sequence or at the end.
+      Initially, every value in this list is ``UNCAPTURED``.
+
+    ``start`` 
+      The index of the first term in the expression to consider matching, initially ``0``, meaning the first term in the list.
+      Terms before this are not included in the match.
+
+    ``pc`` 
+      'Pattern pointer' - a pointer into the list of rule terms.
+      Initially ``0``, meaning the first term.
+
+    ``ic``
+      'Input pointer' - a pointer into the list of expression terms.
+      Initially ``0``, meaning the first term.
+
+    Consumed
+      A rule term is :dfn:`consumed` if its quantifiers allow no more expression terms to be matched against it.
+
+    Enough
+      A rule term has :dfn:`had enough` if the number of expression terms matched against it is at least the minimum required by its quantifiers.
+
+    To find a match, repeat the following **loop** until done:
+
+    .. proof:algorithm:: Main loop
+
+        * Move to the next unconsumed rule term: as long as the rule term pointed to by ``pc`` is consumed, increment ``pc``.
+
+        * If the input pointer ``ic`` has reached the end of the expression terms:
+
+          * Move to the next rule term that hasn't had enough: while the rule term at ``pc`` has had enough, increment ``pc``.
+
+          * If ``pc`` has reached the end of the list of rule terms:
+
+            * If there is any rule term that has not had enough, :ref:`find-sequence-match-backtrack`.
+
+            * Otherwise, **this is a match**.
+
+          * Otherwise, there are still some unmatched rule terms, so :ref:`find-sequence-match-backtrack`.
+
+        * Otherwise, if the pattern pointer ``pc`` has reached the end of the rule terms, there are unconsumed expression terms:
+
+          * If "Allow other terms" isturned on:
+
+            * If "Commutative" is turned on, then mark the expression term pointed to by ``ic`` as ``END``, and :ref:`find-sequence-match-advance-input`.
+
+            * Otherwise, capture all the remaining expression terms as ``END``, and move the input pointer ``ic`` to the end.
+
+          * Otherwise, :ref:`find-sequence-match-backtrack`.
+
+        * Otherwise, check if the expression term pointed to by ``ic`` matches the rule term pointed to by ``pc``.
+
+          If it does, and all captured name assignments are valid, capture ``ic`` as matching ``pc`` and :ref:`find-sequence-match-advance-input`.
+
+        * Otherwise, this expression term doesn't match the current rule term. 
+          If "Commutative" is turned on, or if the rule terms pointed to by ``pc`` has had enough, increment ``pc``.
+
+        * If none of those apply, :ref:`find-sequence-match-backtrack`.
+
+    .. _find-sequence-match-backtrack:
+
+    .. proof:algorithm:: Backtrack
+
+        Find the last place we made a choice:
+
+        * If "Allow other terms" is turned on, ``ic = start``, the number of captured terms is equal to ``start`` and less than the number of input terms, then try ignoring the term pointed to by ``ic``:
+
+          Capture the expression term pointed to by ``ic`` as ``START``, and :ref:`find-sequence-match-increment-start`.
+
+        * Otherwise:
+
+          * Move ``ic`` back at least one place, to the last term before ``start`` or the last term not captured as ``END`` or ``UNCAPTURED``, whichever is last.
+
+          * If ``ic < start``:
+
+            * If "Allow other terms" is turned on and ``start`` is not at the end:
+
+              * :ref:`find-sequence-match-increment-start`.
+
+              * Capture all terms before ``start`` as ``START``.
+
+            * Otherwise, there is no match: no expression terms have matched any rule terms.
+
+          * Set ``pc`` to the position after the one which the expression term pointed to by ``ic`` is captured as (or just the end, if the term at ``ic`` is captured as ``END``).
+
+          * Mark all expression terms after ``ic`` as ``UNCAPTURED``.
+
+    .. _find-sequence-match-increment-start:
+
+    .. proof:algorithm:: Increment ``start``
+
+        * Set ``ic = start``, so we ignore expression terms before that.
+
+        * Set ``pc = 0``, since we're effectively starting the matching process again with a smaller list of expression terms.
+
+    .. _find-sequence-match-advance-input:
+
+    .. proof:algorithm:: Advance input
+
+        * Increment ``ic``.
+
+        * If "Commutative" is turned on, set ``pc = 0``, so that each expression term can eventually be tried against every rule term.
+
+    If a match is found, then we need to match up captured names from each term to produce a final match result.
+
+    For each expression term ``exprTerm`` matched against a rule term ``ruleTerm``, record that ``exprTerm`` was matched against each of the names captured by ``ruleTerm``, and merge this with any names captured inside ``ruleTerm``.
+
+    For each rule term with a :attr:`Term.defaultValue` that did not match any expression terms, match the default value against all the rule term's capturing names.
+
+    Record expression terms captured as ``START`` or ``END`` in separate lists, as well as the operator.
+    These will be used in :func:`rewrite`.
+
+.. _simplification-rules:
 
 Simplification rules
 ####################
 
 A *simplification rule* is a term rewriting rule :math:`l \to r`.
 For example, :math:`x \times (y \times z) \to (x \times y) \times z` changes the order in which a product of three terms is evaluated.
-In this instance, :math:`x`, :math:`y` and :math:`z` are arbitrary
-sub-expressions.
+In this instance, :math:`x`, :math:`y` and :math:`z` are arbitrary sub-expressions.
 
 If this rule was applied repeatedly to an arbitrarily bracketed product of several terms, the final expression would end up looking like:
 
@@ -650,1193 +836,46 @@ If this rule was applied repeatedly to an arbitrarily bracketed product of sever
 
     (((\ldots (t_1 \times t_2) \times t_3) \ldots ) \times t_n)
 
-The process of 'simplification' works as follows, starting with an
-input tree :math:`T` and a list of rules :math:`R`:
+.. _simplify-algorithm:
 
-* First, simplify all arguments of :math:`T`.
+.. function:: simplify(rules,exprTree)
 
-* Apply this loop:
+    Apply this loop:
 
-  * Find the first rule :math:`r \in R` that matches :math:`T`
-    If there is none, exit the loop.
+    * First, :ref:`simplify <simplify-algorithm>` all arguments of :math:`exprTree`.
 
-  * Use :math:`r` to rewrite :math:`T`.
+    * Find the first rule ``r`` in ``rules`` that matches ``exprTree``.
 
-.. class:: Rule
+      If there is none, exit the loop, returning the latest version of ``exprTree``.
 
-    The ``Rule`` object represents a pattern-matching rule.
-    It can also provide a transformation for matched expressions, making it a rewriting rule.
+    * Use ``r`` to :ref:`rewrite <rewrite-algorithm>` ``exprTree``.
 
-    .. property:: pattern 
-        :type: Tree
+.. _rewrite-algorithm:
 
-        A tree representing the pattern to match.
+.. function:: rewrite(ruleTree, resultTree, exprTree)
 
-    .. property:: result
-        :type: Tree
+    :ref:`Match <matching-a-pattern>` ``exprTree`` against ``ruleTree``.
 
-        A tree representing the transformation this rewriting rule represents - names matched in :attr:`pattern` are substituted into this.
+    If there's no match, return ``exprTree`` unchanged.
 
-    .. property:: options
+    We now have a set of captured names, and a corresponding sub-expression for each of them constructed from parts of ``exprTree`` or default values defined in the rule.
 
-        :ref:`pattern-matching-options` dictating how the pattern matches.
+    For names defined in ``ruleTree`` that did not capture anything, associate them with a 'nothing' value.
 
+    For each name captured in the match, substitute the corresponding values into ``resultTree``.
 
-    .. code-block:: javascript
+    Apply post-replacement rules:
 
-        /** Simplification rule.
-         *
-         * @memberof Numbas.jme.rules
-         * @class
-         *
-         * @param {JME} pattern - Expression pattern to match. Variables will match any sub-expression.
-         * @param {JME} result - Expression pattern to rewrite to.
-         * @param {string|Numbas.jme.rules.matchTree_options} options
-         * @param {string} [name] - A human-readable name for the rule
-         *
-         * @property {JME} patternString - The JME string defining the pattern to match.
-         * @property {JME} resultString - The JME string defining the result of the rule.
-         * @property {Numbas.jme.rules.matchTree_options} options - Default options for the match algorithm.
-         * @property {JME} conditionStrings - JME strings defining the conditions.
-         * @property {Numbas.jme.tree} patternTree - `patternString` compiled to a syntax tree.
-         * @property {Numbas.jme.tree} result - The parameter `result` compiled to a syntax tree.
-         * @property {Numbas.jme.tree[]} conditions - The parameter `conditions` compiled to syntax trees.
-         */
-        var Rule = jme.rules.Rule = function(pattern,result,options,name) {
-            this.name = name;
-            this.patternString = pattern;
-            this.pattern = patternParser.compile(pattern);
-            if(typeof(options)=='string') {
-                options = parse_options(options);
-            }
-            this.options = options || {};
-            this.resultString = result;
-            this.result = jme.compile(result);
-        }
-        Rule.prototype = /** @lends Numbas.jme.rules.Rule.prototype */ {
-            toString: function() {
-                return this.patternString+' -> '+this.resultString;
-            },
+    * Replace ``eval(expr)`` with the result of evaluating ``expr``.
 
-            /** Extend this rule's default options with the given options.
-             *
-             * @param {Numbas.jme.rules.matchTree_options} options
-             * @returns {Numbas.jme.rules.matchTree_options}
-             */
-            get_options: function(options) {
-                if(!options) {
-                    return this.options;
-                } else {
-                    return extend_options(this.options,options);
-                }
-            },
-            /** Match a rule on given syntax tree.
-             *
-             * @memberof Numbas.jme.rules.Rule.prototype
-             * @param {Numbas.jme.tree} exprTree - The syntax tree to test.
-             * @param {Numbas.jme.Scope} scope - Used when checking conditions.
-             * @returns {boolean|Numbas.jme.rules.jme_pattern_match} - `false` if no match, or a dictionary of matched subtrees.
-             * @see Numbas.jme.rules.matchTree
-             */
-            match: function(exprTree,scope) {
-                return matchTree(this.pattern,exprTree,this.get_options({scope:scope}));
-            },
+    * Replace binary operations where one argument is 'nothing' with just the other argument, i.e. replace ``nothing (op) x`` and ``x (op) nothing`` with ``x``.
 
-            /** Find all matches for the rule, anywhere within the given expression.
-             *
-             * @param {Numbas.jme.tree} exprTree - The syntax tree to test.
-             * @param {Numbas.jme.Scope} scope - Used when checking conditions.
-             * @returns {Array.<Numbas.jme.rules.jme_pattern_match>}
-             * @see {Numbas.jme.rules.matchAllTree}
-             */
-            matchAll: function(exprTree,scope) {
-                return matchAllTree(this.pattern,exprTree,this.get_options({scope:scope}));
-            },
+    If the match has any expression terms that were ignored in :func:`matchTermSequence`, add these: using the recorded operator ``op``, ignored terms ``rest_start`` and ``rest_end``, and the rewritten tree ``result``, produce ``rest_start (op) result (op) rest_end``.
 
-            /** Transform the given expression if it matches this rule's pattern.
-             *
-             * @param {Numbas.jme.tree} exprTree - The syntax tree to transform.
-             * @param {Numbas.jme.Scope} scope - Used when checking conditions.
-             * @returns {Numbas.jme.rules.transform_result}
-             * @see Numbas.jme.rules.transform
-             */
-            replace: function(exprTree,scope) {
-                return transform(this.pattern, this.result, exprTree, this.get_options({scope:scope}));
-            },
-
-            /** Transform all occurences of this rule's pattern in the given expression.
-             *
-             * @param {Numbas.jme.tree} exprTree - The syntax tree to transform.
-             * @param {Numbas.jme.Scope} scope - Used when checking conditions.
-             * @returns {Numbas.jme.rules.transform_result}
-             * @see Numbas.jme.rules.transform
-             */
-            replaceAll: function(exprTree,scope) {
-                return transformAll(this.pattern, this.result, exprTree, this.get_options({scope: scope}));
-            }
-        }
-
-
-.. _match-sequence:
-
-Sequences
-#########
-
-Many routines rely on matching sequences of terms, either joined by associative operations of equal precedence, or a tuple.
-
-To identify a sequence, we might need to apply the law of associativity for binary operations.
-
-When matching a sequence pattern we might need to apply the law of commutativity, to match terms which appear in a different order to that used in the pattern.
-
-It's convenient when matching sums or products of terms to treat ``x-y`` as ``x+(-y)`` and ``x/y`` as ``x*(/y)``.
-There's no conventional symbol for a unary "reciprocal" operator analogous to the unary "negation" operator, but it's useful here.
-
-.. function:: matchTermSequence
-
-    Given a list of rule terms and a list of expression terms, return a
-    dictionary mapping captured names to lists of expressions matched
-    against them.
-
-    Keep track of what names have been matched for each term in the
-    expression.
-
-    Try to come up with an assignment of expression terms to rule terms,
-    'ignored start', or 'ignored end'.
-    A rule term might match more than one expression term, if quantifiers allow.
-
-    An expression term matches a rule term if matchTree returns true.
-
-    An assignment is valid if, for each identified name captured in an
-    expression term, it's equal under compareTrees to all matches of the
-    name in previous terms.
-
-    Run ``findSequenceMatch`` to find an acceptable assignment.
-
-    pretend the default value matched it.
-    merge captured names from each expression term.
-
-    add the expression to the corresponding list.
-
-    Capture any ignored terms as ``rest_start``, ``rest_end`` and collected
-    together as ``rest``.
-
-    .. code-block:: javascript
-
-        /** Match a sequence of terms.
-         * Calls {@link Numbas.jme.rules.findSequenceMatch}, and uses {@link Numbas.jme.rules.matchTree} to match individual terms up.
-         *
-         * @param {Array.<Numbas.jme.rules.Term>} ruleTerms - The terms in the pattern.
-         * @param {Array.<Numbas.jme.rules.Term>} exprTerms - The terms in the expression.
-         * @param {boolean} commuting - Can the terms match in any order?
-         * @param {boolean} allowOtherTerms - Allow extra terms which don't match any of the pattern terms?
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @param {Numbas.jme.rules.matchTree_options} term_options - Options to use when matching individual terms.
-         * @returns {boolean|object.<Numbas.jme.jme_pattern_match>} - False if no match, or a dictionary mapping names to lists of subexpressions matching those names (it's up to whatever called this to join together subexpressions matched under the same name).
-         */
-        function matchTermSequence(ruleTerms, exprTerms, commuting, allowOtherTerms, options, term_options) {
-            term_options = term_options || options;
-            var matches = {};
-            exprTerms.forEach(function(_,i){ matches[i] = {} });
-
-            /** Does the given input term match the given rule term?
-             * The indices of the input and rule terms are given so the result of the match can be cached.
-             *
-             * @param {Numbas.jme.rules.term} exprTerm - The input term.
-             * @param {Numbas.jme.rules.term} ruleTerm - The term in the pattern which must be matched.
-             * @param {number} ic - The index of the input term.
-             * @param {number} pc - The index of the rule term.
-             * @returns {boolean}
-             */
-            function term_ok(exprTerm,ruleTerm,ic,pc) {
-                if(matches[ic][pc]===undefined) {
-                    var m = matchTree(ruleTerm.term,exprTerm.term,term_options);
-                    var inside_equalnames = {};
-                    ruleTerm.inside_equalnames.forEach(function(name) {
-                        if(m[name]) {
-                            inside_equalnames[name] = m[name];
-                        } else if(ruleTerm.names.some(function(n){return resolveName(n).name==name})) {
-                            inside_equalnames[name] = m._match;
-                        }
-                    });
-                    var outside_equalnames = {};
-                    ruleTerm.outside_equalnames.forEach(function(name) {
-                        if(m[name]) {
-                            outside_equalnames[name] = m[name];
-                        } else if(ruleTerm.names.some(function(n){return resolveName(n).name==name})) {
-                            outside_equalnames[name] = m._match;
-                        }
-                    });
-                    matches[ic][pc] = {
-                        match: m,
-                        inside_equalnames: inside_equalnames,
-                        outside_equalnames: outside_equalnames
-                    }
-                }
-                return matches[ic][pc].match!==false; 
-            }
-
-            /** Does the given assignment satisfy the constraints of the matching algorithm?
-             * At the moment, the only constraint is that all subexpressions matched with the same name using the `;=` operator must be equal, according to {@link Numbas.jme.compareTrees}.
-             *
-             * @param {object} assignment - The result of {@link Numbas.jme.rules.findSequenceMatch}.
-             * @param {number} ic - The current index in the list of input terms. Only matches introduced by this term are considered - previous terms are assumed to have already passed the constraint check.
-             * @param {number} pc - The current index in the list of pattern terms.
-             * @returns {boolean}
-             */
-            function constraint_ok(assignment,ic,pc) {
-                var m1 = matches[ic][pc];
-                var ruleTerm = ruleTerms[pc];
-                if(ruleTerm.inside_equalnames.length==0 && ruleTerm.outside_equalnames.length==0) {
-                    return true;
-                }
-                var ok = assignment.every(function(p,i) {
-                    if(p<0 || p>=ruleTerms.length) {
-                        return true;
-                    }
-                    var m2 = matches[i][p];
-                    var equalnames = p==pc ? 'inside_equalnames' : 'outside_equalnames';
-                    return ruleTerm[equalnames].every(function(name) {
-                        var e1 = m1[equalnames][name];
-                        var e2 = m2[equalnames][name];
-                        if(e1===undefined || e2===undefined) {
-                            return true;
-                        }
-                        var res = jme.compareTrees(e1, e2) == 0;
-                        return res;
-                    });
-                });
-                return ok;
-            }
-
-            var assignment = findSequenceMatch(ruleTerms,exprTerms,{checkFn: term_ok, constraintFn: constraint_ok, commutative: commuting, allowOtherTerms: allowOtherTerms});
-            if(assignment===false) {
-                return false;
-            }
-
-            var namedTerms = {};
-
-            var identified_names = {};
-            ruleTerms.forEach(function(ruleTerm,i) {
-                var equalnames = ruleTerm.outside_equalnames;
-                equalnames.forEach(function(name) {
-                    identified_names[name] = identified_names[name] || ruleTerm;
-                });
-            });
-            /** Record that `exprTree` was captured with the given name.
-             *
-             * @param {string} name
-             * @param {Numbas.jme.tree} exprTree
-             * @param {Numbas.jme.rules.Term} ruleTerm
-             * @param {boolean} allowReservedName - If `false`, reserved names such as `_match` and `_rest`, which are introduced by the matching algorithm, will be ignored.
-             */
-            function nameTerm(name,exprTree,ruleTerm,allowReservedName) {
-                if(!allowReservedName && name.match(/^_/)) {
-                    return;
-                }
-                if(!namedTerms[name]) {
-                    namedTerms[name] = [];
-                }
-                if(identified_names[name]!==undefined && identified_names[name]!==ruleTerm && namedTerms[name].length) {
-                    return;
-                }
-                namedTerms[name].push(exprTree);
-            }
-            /** Record that `exprTree` was matched against `ruleTerm` - add `exprTree` to all of `ruleTerm`'s names.
-             *
-             * @param {Numbas.jme.rules.term} ruleTerm
-             * @param {Numbas.jme.tree} exprTree
-             */
-            function matchTerm(ruleTerm,exprTree){ 
-                ruleTerm.names.forEach(function(name) {
-                    var o = resolveName(name,exprTree);
-                    nameTerm(o.name,o.value,ruleTerm);
-                });
-            }
-
-            assignment.result.forEach(function(is,j) {
-                var ruleTerm = ruleTerms[j];
-
-                if(is.length) {
-                    is.forEach(function(i) {
-                        var match = matches[i][j].match;
-                        for(var name in match) {
-                            nameTerm(name,match[name],ruleTerm);
-                        }
-                        matchTerm(ruleTerm,exprTerms[i].term);
-                    });
-                } else if(ruleTerm.defaultValue) {
-                    matchTerm(ruleTerm,ruleTerm.defaultValue);
-                }
-            });
-            assignment.ignored_start_terms.forEach(function(i) {
-                nameTerm('_rest',exprTerms[i].term,undefined,true);
-                nameTerm('_rest_start',exprTerms[i].term,undefined,true);
-            });
-            assignment.ignored_end_terms.forEach(function(i) {
-                nameTerm('_rest',exprTerms[i].term,undefined,true);
-                nameTerm('_rest_end',exprTerms[i].term,undefined,true);
-            });
-
-            return namedTerms;
-        }
-
-.. function:: findSequenceMatch
-
-    Given a sequence of rule terms and a sequence of expression terms;
-    routines to decide if an expression term matches a rule term, and if an
-    assignment satisfies all constraints.
-    Return an array containing a list of expression terms matched against each rule term, and lists of ignored
-    terms at the start and end of the expression sequence.
-
-    Each rule term has a minimum and a maximum bound on the number of times
-    it must be matched.
-
-    The match can be commutative, in which case expression terms can match
-    out of order, and optionally allow expression terms to be ignored in
-    order to obtain a match with the remainder.
-
-    This is a backtracking algorithm.
-
-    .. code-block:: javascript
-
-        /** Options for {@link Numbas.jme.rules.findSequenceMatch}.
-         *
-         * @type {object}
-         * @typedef Numbas.jme.rules.findSequenceMatch_options
-         * @property {boolean} allowOtherTerms - If `true`, terms that don't match any term in the pattern can be ignored.
-         * @property {boolean} commutative - Can the input terms be considered in any order?
-         * @property {Function} constraintFn - Function to test if the current set of matches satisfies constraints.
-         * @property {Function} checkFn - Function to test if an input term matches a given pattern term.
-         */
-
-        /** Match a sequence of terms against a given pattern sequence of terms.
-         * Try to find an assignment of input terms to the pattern, satisfying the quantifier for each term in the pattern.
-         * The match is greedy - input terms will match earlier pattern terms in preference to later ones.
-         *
-         * @function
-         * @memberof Numbas.jme.rules
-         *
-         * @param {Array.<Numbas.jme.rules.term>} pattern
-         * @param {Array.<Numbas.jme.tree>} input
-         * @param {Numbas.jme.rules.findSequenceMatch_options} options
-         * @returns {object} - `ignored_start_terms` is terms at the start that weren't used in the match, `ignored_end_terms` is any other terms that weren't used, and `result[i]` is a list of indices of terms in the input that were matched against pattern term `i`.
-         */
-        var findSequenceMatch = jme.rules.findSequenceMatch = function(pattern,input,options) {
-            var capture = [];
-            var start = 0;
-            var done = false;
-            var failed = false;
-            var pc = 0;
-            var ic = 0;
-
-            /** Count the number of times we have matched pattern term `p` so far.
-             *
-             * @param {number} p - The index of the term.
-             * @returns {number}
-             */
-            function count(p) {
-                return capture.filter(function(x){return x==p}).length;
-            }
-            /** Have we consumed pattern term `p` as many times as allowed?
-             *
-             * @param {number} p
-             * @returns {boolean}
-             */
-            function consumed(p) {
-                return count(p)>=pattern[p].max;
-            }
-            /** Have we matched this pattern term at least its minimum number of times?
-             *
-             * @param {number} p - The index of the pattern term.
-             * @returns {boolean}
-             */
-            function enough(p) {
-                return count(p)>=pattern[p].min;
-            }
-            /** Move the start pointer along one.
-             * Terms before the start will be returned in `ignored_start_terms`.
-             */
-            function increment_start() {
-                //debug('increment start position');
-                start += 1;
-                ic = start;
-                pc = 0;
-            }
-            /** Backtrack to the last time we made a free choice.
-             * If we're already at the start and `allowOtherTerms` is enabled, advance the start pointer.
-             */
-            function backtrack() {
-                //debug('backtrack');
-                if(options.allowOtherTerms && ic==start && capture.length==start && start<input.length-1) {
-                    capture.push(-1);
-                    increment_start();
-                    return;
-                } 
-                
-                ic -= 1;
-                while(ic>=start && (ic>=capture.length || capture[ic]>=pattern.length)) {
-                    ic -= 1;
-                }
-                //debug('backtracked to '+ic);
-
-                if(ic<start) {
-                    if(options.allowOtherTerms && start<input.length-1) {
-                        capture = [];
-                        increment_start();
-                        for(var i=0;i<start;i++) {
-                            capture.push(-1);
-                        }
-                        return;
-                    } else {
-                        failed = true;
-                        return;
-                    }
-                }
-                pc = capture[ic]+1;
-                capture = capture.slice(0,ic);
-            }
-            /** Move the input pointer along one.
-             * If using commutativity, set the pattern pointer back to the start.
-             */
-            function advance_input() {
-                ic += 1;
-                if(options.commutative) {
-                    pc = 0;
-                }
-            }
-            var steps = 0;
-            while(!done && !failed) {
-                //show();
-                steps += 1;
-                while(pc<pattern.length && consumed(pc)) { // if have consumed this term fully, move on
-                    //debug('term '+pc+' consumed, move on');
-                    pc += 1;
-                }
-                if(ic==input.length) { // if we've reached the end of the input
-                    while(pc<pattern.length && enough(pc)) {
-                        //debug('got enough of '+pc+', skip forward');
-                        pc += 1;
-                    }
-                    if(pc==pattern.length) { // if we've consumed all the terms
-                        if(!pattern.every(function(_,p) { return enough(p); })) {
-                            //debug('reached end but some terms not matched enough times');
-                            backtrack();
-                        } else {
-                            //debug('reached end of pattern and end of input: done');
-                            done = true;
-                        }
-                    } else {
-                        //debug('end of input but still pattern to match')
-                        backtrack();
-                    }
-                } else if(pc>=pattern.length) {
-                    //debug("end of pattern but unconsumed input");
-                    if(pc==pattern.length && options.commutative && options.allowOtherTerms) {
-                        //debug('capturing '+ic+' as ignored end term');
-                        capture.push(pattern.length);
-                        advance_input();
-                    } else if(pc==pattern.length && !options.commutative && options.allowOtherTerms) {
-                        while(ic<input.length) {
-                            //debug('capturing '+ic+' as ignored end term');
-                            capture.push(pattern.length);
-                            advance_input();
-                        }
-                    } else {
-                        backtrack();
-                    }
-                } else if(options.checkFn(input[ic],pattern[pc],ic,pc) && options.constraintFn(capture,ic,pc)) {
-                    //debug('capture '+ic+' at '+pc);
-                    capture.push(pc);
-                    advance_input();
-                } else if(options.commutative || enough(pc)) {
-                    //debug('trying the next pattern term');
-                    pc += 1;
-                } else {
-                    //debug('can\'t match next input')
-                    backtrack();
-                }
-            }
-            if(failed) {
-                return false;
-            }
-            var result = pattern.map(function(p,i) {
-                return capture.map(function(_,j){return j}).filter(function(j){ return capture[j] == i;});
-            });
-            if(options.commutative) {
-                var ignored_start_terms = [];
-                var ignored_end_terms = [];
-                var ignored = ignored_start_terms;
-                capture.forEach(function(p,i) {
-                    if(p==pattern.length) {
-                        ignored.push(i);
-                    } else {
-                        ignored = ignored_end_terms;
-                    }
-                });
-            } else {
-                var ignored_start_terms = input.slice(0,start).map(function(_,j){return j});
-                var ignored_end_terms = capture.map(function(_,j){return j}).filter(function(j){return capture[j]==pattern.length});
-            }
-            //debug(result);
-            return {ignored_start_terms: ignored_start_terms, result: result, ignored_end_terms: ignored_end_terms};
-        }
-
-
-.. _pattern-matching-options:
-
-Options
-#######
-
--  Commutative - When matching terms joined by a commutative operation
-   such as :math:`\times` or :math:`+`, match terms in any order.
-
--  Associative - When matching terms joined by an associative operation,
-   collect as many terms as possible to match at once, instead of just
-   the two subtrees of the first application of the operation. 
-   e.g., :math:`(a+b)+c` is matched as a list of three terms :math:`a`,
-   :math:`b`, :math:`c`, not two terms :math:`a+b` and :math:`c`.
-
--  Allow other terms - Match a sequence of terms where the pattern is
-   satisfied by a subset of the terms. e.g., :math:`1+2+x` matches
-   ``n +n`` - the extra :math:`x` is ignored. In a non-commutative
-   match, the pattern must match a contiguous subsequence of the terms.
-
--  Strict inverse - If turned off, ``x-y`` will be considered as
-   ``x+(-y)``, so will match patterns like ``?+?``.
-   Similar for ``x/y`` being interpreted as ``x*(/y)``.
-   If turned on, plus means plus!
-
-- Gather as a sequence - If turned off, then multiple terms matched under the same name will be stored in a list.
-  If turned on, then they will be captured as a sequence of terms joined by the same operator used to find them, e.g. addition or multiplication.
-
-
-.. function:: matchAnywhere
-
-    .. code-block:: javascript
-
-        /** Match if the given pattern occurs as a subexpression anywhere in the given expression.
-         *
-         * @param {Numbas.jme.tree} ruleTree
-         * @param {Numbas.jme.tree} exprTree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.jme_pattern_match}
-         */
-        function matchAnywhere(ruleTree,exprTree,options) {
-            var m = matchTree(ruleTree,exprTree,options);
-            if(m!==false) {
-                return m;
-            }
-            if(exprTree.args) {
-                for(var i=0;i<exprTree.args.length;i++) {
-                    var am = matchAnywhere(ruleTree,exprTree.args[i],options);
-                    if(am!==false)  {
-                        return am;
-                    }
-                }
-            }
-            return false;
-        }
-
-.. function:: matchGenericOp
-
-    .. code-block:: javascript
-
-        /** Match the application of any operator. The first argument of `ruleTree` is a pattern that the operator's name, considered as a string, must satisfy, and the second argument is a pattern that the operator's arguments, considered as a list, must satisfy.
-         *
-         * @param {Numbas.jme.tree} ruleTree - The pattern to match.
-         * @param {Numbas.jme.tree} exprTree - The expression being considered.
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.jme_pattern_match}
-         */
-        function matchGenericOp(ruleTree,exprTree,options) {
-            if(exprTree.tok.type!='op') {
-                return false;
-            }
-            var nameRule = ruleTree.args[0];
-            var argsRule = ruleTree.args[1];
-            var exprNameTree = {tok: new jme.types.TString(exprTree.tok.name)};
-            var argsTree = {tok: new jme.types.TList(), args: exprTree.args};
-            var m_name = matchTree(nameRule, exprNameTree, options);
-            var m_args = matchTree(argsRule, argsTree, options);
-            if(m_name && m_args) {
-                return mergeMatches([m_name,m_args]);
-            } else {
-                return false;
-            }
-        }
-
-.. function:: matchWhere
-
-    .. code-block:: javascript
-
-        /** Match a `where` condition - the expression must match the given pattern, and the condition specified in terms of the matched names must evaluate to `true`.
-         *
-         * @param {Numbas.jme.tree} pattern - The pattern to match.
-         * @param {Numbas.jme.tree} condition - The condition to evaluate.
-         * @param {Numbas.jme.tree} exprTree - The expression being considered.
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.jme_pattern_match}
-         */
-        function matchWhere(pattern,condition,exprTree,options) {
-            var scope = new Numbas.jme.Scope(options.scope);
-
-            var m = matchTree(pattern,exprTree,options);
-            if(!m) {
-                return false;
-            }
-
-            condition = Numbas.util.copyobj(condition,true);
-            condition = jme.substituteTree(condition,new jme.Scope([{variables:m}]),true);
-            try {
-                var cscope = new jme.Scope([scope,{variables:m}]);
-                var result = cscope.evaluate(condition,null,true);
-                if(result.type=='boolean' && result.value==false) {
-                    return false;
-                }
-            } catch(e) {
-                return false;
-            }
-            return m;
-        }
-
-.. function:: matchMacro
-
-    .. code-block:: javascript
-
-        /** Substitute sub-patterns into a bigger pattern before matching.
-         *
-         * @param {Numbas.jme.tree} subPatterns - A dictionary of patterns.
-         * @param {Numbas.jme.tree} pattern - The pattern to substitute into.
-         * @param {Numbas.jme.tree} exprTree - The expression being considered.
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.jme_pattern_match}
-         */
-        function matchMacro(subPatterns, pattern, exprTree, options) {
-            if(subPatterns.tok.type!='dict') {
-                throw(new Numbas.Error('jme.matchTree.match macro first argument not a dictionary'));
-            }
-            var d = {}
-            subPatterns.args.forEach(function(keypair) {
-                var name = keypair.tok.key;
-                var tree = keypair.args[0];
-                d[name] = tree;
-            });
-            pattern = jme.substituteTree(pattern,new jme.Scope([{variables:d}]),true);
-            return matchTree(pattern,exprTree,options)
-        }
-
-.. function:: matchOrdinaryFunction
-
-    .. code-block:: javascript
-
-        /** Match the application of a function.
-         * Matches if the expression is the application of the same function, and all of the arguments match the arguments of the pattern.
-         *
-         * @param {Numbas.jme.tree} ruleTree - The pattern to match.
-         * @param {Numbas.jme.tree} exprTree - The expression being considered.
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.jme_pattern_match}
-         */
-        function matchOrdinaryFunction(ruleTree,exprTree,options) {
-            var ruleTok = ruleTree.tok;
-            var exprTok = exprTree.tok;
-            if(exprTok.type!='function' || (ruleTok.name!='?' && ruleTok.name!=exprTok.name)) {
-                return false;
-            }
-            var ruleArgs = ruleTree.args.map(function(t){ return new Term(t); });
-            var exprArgs = exprTree.args.map(function(t){ return new Term(t); });
-
-            var namedTerms = matchTermSequence(ruleArgs,exprArgs,false,false,options);
-            if(namedTerms===false) {
-                return false;
-            }
-
-            /** Is the given name captured by this tree?
-             *
-             * @param {string} name
-             * @param {Numbas.jme.tree} tree
-             * @returns {boolean}
-             */
-            function name_captured(name,tree) {
-                if(jme.isOp(tree.tok,';')) {
-                    var res = resolveName(tree.args[1]);
-                    if(res.name==name) {
-                        return true;
-                    }
-                }
-                if(tree.args) {
-                    return tree.args.some(function(t2){ return name_captured(name,t2); });
-                }
-                return false;
-            }
-
-            // collate the named groups
-            var match = {};
-            for(var name in namedTerms) {
-                var occurrences = 0;
-                for(var i=0;i<ruleTree.args.length;i++) {
-                    if(name_captured(name,ruleTree.args[i])) {
-                        occurrences += 1;
-                    }
-                }
-                var terms = namedTerms[name];
-                match[name] = occurrences<=1 ? terms[0] : {tok: new jme.types.TList(terms.length), args: terms};
-            }
-            return match;
-        }
-
-.. function:: resolveName
-
-    .. code-block:: javascript
-
-        /** Resolve the name and value to store when capturing a subexpression.
-         *
-         * @param {Numbas.jme.tree} nameTree - The right-hand side of the `;` capturing operator. Either a name, or a keypair giving a name and the value to store.
-         * @param {Numbas.jme.tree} value - The value to store, if `nameTree` doesn't override it.
-         * @returns {object} - `name` is the name to store under, and `value` is the value.
-         */
-        function resolveName(nameTree,value) {
-            var nameTok = nameTree.tok;
-            if(!(nameTok.type=='name' || nameTok.type=='keypair')) {
-                throw(new Numbas.Error('jme.matchTree.group name not a name'));
-            }
-            var name;
-            if(nameTok.type=='name') {
-                name = nameTok.name;
-            } else if(nameTok.type=='keypair') {
-                name = nameTok.key;
-                value = nameTree.args[0];
-            }
-            return {name: name, value: value};
-        }
-
-.. function:: findCapturedNames
-
-    .. code-block:: javascript
-
-        /** Find names captured by this pattern.
-         *
-         * @param {Numbas.jme.tree} ruleTree
-         * @returns {Array.<string>}
-         */
-        var findCapturedNames = jme.rules.findCapturedNames = function(ruleTree) {
-            var tok = ruleTree.tok;
-            var names = [];
-            if(jme.isOp(tok,';') || jme.isOp(tok,';=')) {
-                var res = resolveName(ruleTree.args[1]);
-                names.push(res.name);
-            }
-            if(ruleTree.args) {
-                for(var i=0;i<ruleTree.args.length;i++) {
-                    var argnames = findCapturedNames(ruleTree.args[i]);
-                    names = names.merge(argnames);
-                }
-            }
-            return names;
-        }
-
-.. function:: matchAny
-
-    .. code-block:: javascript
-
-        /** Match any of the given patterns.
-         * The first pattern which successfully matches is used.
-         *
-         * @param {Array.<Numbas.jme.tree>} patterns
-         * @param {Numbas.jme.tree} exprTree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchAny(patterns,exprTree,options) {
-            for(var i=0;i<patterns.length;i++) {
-                var m = matchTree(patterns[i],exprTree,options);
-                if(m) {
-                    return m;
-                }
-            }
-            return false;
-        }
-
-.. function:: matchDefault
-
-    .. code-block:: javascript
-
-        /** Perform a match with a default value.
-         * This operation only makes sense when matching a sequence of terms, so just match the pattern.
-         *
-         * @param {Numbas.jme.tree} ruleTree
-         * @param {Numbas.jme.tree} defaultValue - Ignored.
-         * @param {Numbas.jme.tree} exprTree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchDefault(ruleTree, defaultValue, exprTree, options) {
-            var m = matchTree(ruleTree,exprTree,options);
-            return m;
-        }
-
-.. function:: matchOptionalPrefix
-
-    .. code-block:: javascript
-
-        /** Match `rule`, or `prefix(rule)` - allow any of a list of optional unary operators at the top of the tree.
-         *
-         * @param {Array.<string>} prefixes - The names of the optional operators.
-         * @param {Numbas.jme.tree} ruleTree
-         * @param {Numbas.jme.tree} exprTree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchOptionalPrefix(prefixes,ruleTree,exprTree,options) {
-            var originalExpr = exprTree;
-            exprTree = extractLeadingMinus(exprTree);
-            for(var i=0;i<prefixes.length;i++) {
-                var prefix = prefixes[i];
-                if(jme.isOp(exprTree.tok,prefix)) {
-                    exprTree = exprTree.args[0];
-                    break;
-                }
-            }
-            var m = matchTree(ruleTree,exprTree,options);
-            if(m) {
-                m._match = originalExpr;
-                return m;
-            } else {
-                return false;
-            }
-        }
-        /** Bring any unary minus to the top of the tree.
-         *
-         * @param {Numbas.jme.tree} tree
-         * @returns {Numbas.jme.tree}
-         */
-        var extractLeadingMinus = jme.rules.extractLeadingMinus = function(tree) {
-            if(jme.isOp(tree.tok,'*') || jme.isOp(tree.tok,'/')) {
-                if(jme.isOp(tree.args[0].tok,'-u')) {
-                    return {tok:tree.args[0].tok, args: [{tok:tree.tok, args: [tree.args[0].args[0],tree.args[1]]}]};
-                } else {
-                    var left = extractLeadingMinus(tree.args[0]);
-                    if(jme.isOp(left.tok,'-u')) {
-                        return {tok: left.tok, args: [{tok: tree.tok, args: [left.args[0], tree.args[1]]}]};
-                    } else {
-                        return tree;
-                    }
-                }
-            } else {
-                return tree;
-            }
-        }
-
-.. function:: matchNot
-
-    .. code-block:: javascript
-
-        /** Match if the expression doesn't match the given pattern.
-         *
-         * @param {Numbas.jme.tree} ruleTree - The pattern which must not be matched.
-         * @param {Numbas.jme.tree} exprTree - The expression to test.
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchNot(ruleTree,exprTree,options) {
-            if(!matchTree(ruleTree,exprTree,options)) {
-                return preserve_match({},exprTree);
-            } else {
-                return false;
-            }
-        }
-
-.. function:: matchUses
-
-    .. code-block:: javascript
-
-        /** Match if the expression uses all of the given names as free variables.
-         *
-         * @param {Array.<string>} names
-         * @param {Numbas.jme.tree} exprTree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchUses(names,exprTree,options) {
-            var vars = jme.findvars(exprTree,[],options.scope);
-            for(var i=0;i<names.length;i++) {
-                if(!vars.contains(names[i])) {
-                    return false;
-                }
-            }
-            return {};
-        }
-
-.. function:: matchType
-
-    .. code-block:: javascript
-
-        /** Match if the top token of the given expression is of the given type.
-         *
-         * @param {string} wantedType - The required type.
-         * @param {Numbas.jme.tree} exprTree
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchType(wantedType,exprTree) {
-            if(exprTree.tok.type==wantedType) {
-                return {};
-            } else {
-                return false;
-            }
-        }
-
-.. function:: matchAnd
-
-    .. code-block:: javascript
-
-        /** Match all of the given patterns against the given expression. 
-         * Return `false` if any of the patterns don't match.
-         *
-         * @param {Array.<Numbas.jme.tree>} patterns
-         * @param {Numbas.jme.tree} exprTree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {boolean|Numbas.jme.rules.jme_pattern_match}
-         */
-        function matchAnd(patterns,exprTree,options) {
-            var matches = [];
-            for(var i=0;i<patterns.length;i++) {
-                var m = matchTree(patterns[i],exprTree,options);
-                if(m) {
-                    matches.push(m);
-                } else {
-                    return false;
-                }
-            }
-            return mergeMatches(matches);
-        }
-
-.. function:: matchAllTree
-
-    .. code-block:: javascript
-
-        /** Find all matches for the rule, anywhere within the given expression.
-         *
-         * @memberof Numbas.jme.rules
-         * @function
-         * @param {Numbas.jme.tree} ruleTree - The pattern to match.
-         * @param {Numbas.jme.tree} exprTree - The syntax tree to test.
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {Array.<Numbas.jme.rules.jme_pattern_match>}
-         */
-        var matchAllTree = jme.rules.matchAllTree = function(ruleTree,exprTree,options) {
-            var matches = [];
-            var m = matchTree(ruleTree,exprTree,options);
-            if(m) {
-                matches = [m];
-            }
-            if(exprTree.args) {
-                exprTree.args.forEach(function(arg) {
-                    var submatches = matchAllTree(ruleTree,arg,options);
-                    matches = matches.concat(submatches);
-                });
-            }
-            return matches;
-        }
-
-.. function:: mergeMatches
-
-    .. code-block:: javascript
-
-        /** Merge a list of matches into one match object.
-         * Later matches override earlier ones: if two matches have the same captured name, the later one is used.
-         *
-         * @param {Array.<Numbas.jme.rules.jme_pattern_match>} matches
-         * @returns {Numbas.jme.rules.jme_pattern_match}
-         */
-        function mergeMatches(matches) {
-            var ms = matches.slice();
-            ms.splice(0,0,{});
-            return util.extend_object.apply(this,ms);
-        }
-
-.. function:: applyPostReplacement
-
-    .. code-block:: javascript
-
-        /** Apply operations specified in the result of a tree transformation: `eval(x)` is replaced with the result of evaluating `x`.
-         *
-         * @memberof Numbas.jme.rules
-         * @function
-         * @param {Numbas.jme.tree} tree
-         * @param {Numbas.jme.rules.matchTree_options} options
-         * @returns {Numbas.jme.tree}
-         */
-        var applyPostReplacement = jme.rules.applyPostReplacement = function(tree,options) {
-            var tok = tree.tok;
-            if(tree.args) {
-                var args = tree.args.map(function(arg) {
-                    return applyPostReplacement(arg,options);
-                });
-                tree = {tok:tok, args: args};
-            }
-            if(jme.isFunction(tok,'eval')) {
-                return {tok: jme.evaluate(tree.args[0],options.scope)};
-            } else if(jme.isFunction(tok,'m_listval')) {
-                var n = tree.args[1].tok.value;
-                return tree.args[0].args[n];
-            } else if(tok.type=='op') {
-                var filled_args = tree.args.filter(function(a) { return a.tok.type!='nothing'; });
-                if(filled_args.length==1 && filled_args.length<tree.args.length) {
-                    return filled_args[0];
-                }
-            }
-
-            return tree;
-        }
-
-.. function:: transform
-
-    .. code-block:: javascript
-
-        /** Object returned by {@link Numbas.jme.rules.transform}.
-         *
-         * @type {object}
-         * @typedef Numbas.jme.rules.transform_result
-         * @property {boolean} changed - Is the result expression different to the input expression?
-         * @property {Numbas.jme.tree} expression - The result expression.
-         */
-
-        /** Replace one expression with another, if it matches the given rule.
-         *
-         * @memberof Numbas.jme.rules
-         * @function
-         * @param {Numbas.jme.tree} ruleTree - The rule to test against.
-         * @param {Numbas.jme.tree} resultTree - The tree to output, with named groups from the rule substituted in.
-         * @param {Numbas.jme.tree} exprTree - The expression to be tested.
-         * @param {Numbas.jme.rules.matchTree_options} options - Options for the match.
-         * @returns {Numbas.jme.rules.transform_result}
-         */
-        var transform = jme.rules.transform = function(ruleTree,resultTree,exprTree,options) {
-            var match = matchTree(ruleTree,exprTree,options);
-            if(!match) {
-                return {expression: exprTree, changed: false};
-            }
-            var names = findCapturedNames(ruleTree);
-            names.forEach(function(name) {
-                if(!(name in match)) {
-                    match[name] = {tok: new jme.types.TNothing()};
-                }
-            });
-
-            var out = jme.substituteTree(resultTree,new jme.Scope([{variables: match}]), true);
-            out = applyPostReplacement(out,options);
-            var ruleTok = ruleTree.tok;
-            if(match._rest_start) {
-                out = {tok: new jme.types.TOp(match.__op__), args: [match._rest_start, out]};
-            }
-            if(match._rest_end) {
-                out = {tok: new jme.types.TOp(match.__op__), args: [out, match._rest_end]};
-            }
-            return {expression: out, changed: !jme.treesSame(exprTree,out,options.scope)};
-        }
-
-.. function:: transformAll
-
-    .. code-block:: javascript
-
-        /** Replace anything matching the rule with the given result, at any position in the given expression.
-         *
-         * @memberof Numbas.jme.rules
-         * @function
-         * @param {Numbas.jme.tree} ruleTree - The rule to test against.
-         * @param {Numbas.jme.tree} resultTree - The tree to output, with named groups from the rule substituted in.
-         * @param {Numbas.jme.tree} exprTree - The expression to be tested.
-         * @param {Numbas.jme.rules.matchTree_options} options - Options for the match.
-         * @returns {Numbas.jme.rules.transform_result}
-         */
-        var transformAll = jme.rules.transformAll = function(ruleTree,resultTree,exprTree,options) {
-            var changed = false;
-            if(exprTree.args) {
-                var args = exprTree.args.map(function(arg){ 
-                    var o = transformAll(ruleTree,resultTree,arg,options);
-                    changed = changed || o.changed;
-                    return  o.expression;
-                });
-                exprTree = {tok: exprTree.tok, args: args};
-            }
-
-            var o = transform(ruleTree,resultTree,exprTree,options);
-            changed = changed || o.changed;
-            return {expression: o.expression, changed: changed};
-        }
-
-.. class:: Ruleset
-
-    .. code-block:: javascript
-
-        /** Set of simplification rules.
-         *
-         * @class
-         * @memberof Numbas.jme.rules
-         * @param {Numbas.jme.rules.Rule[]} rules
-         * @param {Numbas.jme.rules.ruleset_flags} flags
-         */
-        var Ruleset = jme.rules.Ruleset = function(rules,flags) {
-            this.rules = rules;
-            this.flags = util.extend_object({},displayFlags,flags);
-        }
-
-        Ruleset.prototype = /** @lends Numbas.jme.rules.Ruleset.prototype */ {
-            /** Test whether flag is set.
-             *
-             * @param {string} flag
-             * @returns {boolean}
-             */
-            flagSet: function(flag) {
-                flag = jme.normaliseRulesetName(flag);
-                if(this.flags.hasOwnProperty(flag))
-                    return this.flags[flag];
-                else
-                    return false;
-            },
-
-            /** Apply this set's rules to the given expression until they don't change any more.
-             *
-             * @param {Numbas.jme.tree} exprTree
-             * @param {Numbas.jme.Scope} scope
-             * @see Numbas.jme.rules.transform
-             * @see Numbas.jme.rules.matchTree
-             * @returns {Numbas.jme.tree}
-             */
-            simplify: function(exprTree,scope) {
-                var rs = this;
-                var changed = true;
-                var depth = 0;
-                var seen = [];
-                while(changed) {
-                    if(exprTree.args) {
-                        var nargs = exprTree.args.map(function(arg) { return rs.simplify(arg,scope); });
-                        exprTree = {tok: exprTree.tok, args: nargs};
-                    }
-                    changed = false;
-                    for(var i=0;i<this.rules.length;i++) {
-                        var result = this.rules[i].replace(exprTree,scope);
-                        if(result.changed) {
-                            if(depth > 100) {
-                                var str = Numbas.jme.display.treeToJME(exprTree);
-                                if(seen.indexOf(str)!=-1) {
-                                    throw(new Numbas.Error("jme.display.simplifyTree.stuck in a loop",{expr:str}));
-                                }
-                                seen.push(str);
-                            }
-                            changed = true;
-                            exprTree = result.expression;
-                            depth += 1;
-                            break;
-                        }
-                    }
-                }
-                return exprTree;
-            }
-        }
+This is a naive algorithm - with the wrong set of rules, it can get stuck in an infinite loop.
 
 Problems
-########
+--------
 
 “Identified names”, when interacting with commutative match, needs some
 kind of backtracking over trees.
@@ -1849,99 +888,4 @@ term needs to match differently.
 So the identified names should maybe be applied at the very end, to the
 whole expression, but we then need a way of asking for “the next” way of
 matching each set of terms.
-
-Maybe ``findSequenceMatch`` should be a generator for all valid
-assignments, not just return the first one.
-
-Previous work
--------------
-
-WeBWorK
-#######
-
-WeBWorK uses `'bizarro
-arithmetic' <https://github.com/openwebwork/pg/blob/8a089edceb5d3b36500bac47ef3c2daeec10e0e4/macros/bizarroArithmetic.pl>`__
-to force expressions which would be equivalent in standard arithmetic to
-be non-equivalent.
-It then uses the trick of evaluating at randomly chosen points to establish equivalence.
-Still unable to give reliable feedback on the form of the student's answer.
-Quite a lot of work to set it all up (add flags to context, etc.)
-
-`limitedFactor
-context <https://github.com/openwebwork/webwork-open-problem-library/blob/master/OpenProblemLibrary/macros/PCC/contextLimitedFactor.pl>`__
-
-`bizarro math for sine and
-cosine <http://webwork.maa.org/moodle/mod/forum/discuss.php?d=4434>`__ -
-Davide suggests directly inspecting the Formula object to test if it's
-of the form :math:`\sin(\cdot)`.
-
-`Adaptive parameters <http://webwork.maa.org/wiki/AdaptiveParameters>`__
-try to allow for free variables which change the value of an expression
-linearly, i.e.
-:math:`Af(x) + B` instead of :math:`f(x)`.
-Another randomised algorithm is used to establish how the parameters affect the expression, as a matrix - pick some random values for the parameters,
-and solve the resulting system of equations.
-
-Prolog
-######
-
-(Because Chris Sangwin told me to look at it).
-
-Prolog uses a variant of the
-`Martell-Montanari <http://www.nsl.com/misc/papers/martelli-montanari.pdf>`__
-unification algorithm to identify values of free variables on either
-side of an equation so that they are equivalent.
-
-It doesn't allow for missing values, or alternate forms in one
-expression - you'd have to give an equation for each form.
-
-STACK
-#####
-
-STACK has a few answer tests to do with the form of the student's
-answer: LowestTerms, Expanded, FacForm, SingleFrac, PartFrac,
-CompletedSquare.
-
-For anything else, you can apply simplification rules to expressions
-before comparing - the two expressions should end up exactly equal after
-simplifying.
-
-Maxima
-######
-
-Maxima deals with everything as S-expressions, and seems to require
-quite a lot of code to add new rules.
-
-expreduce, Mathics, Mathematica
-###############################
-
-`expreduce <https://github.com/corywalker/expreduce>`__ is a project in Go. 
-Inspired by Mathics, but some syntax differences.
-
-`A video by Brian
-Beckman <https://www.youtube.com/watch?v=S2OEPFbsl50>`__ about how term
-rewriting in the style of Mathematica works.
-`Jacquard <https://archive.codeplex.com/?p=jacquard>`__ is a JavaScript
-clone of Mathematica's syntax.
-
-`Mathics
-pattern-matching <https://mathics.angusgriffith.com/doc/reference-of-built-in-symbols/patterns-and-rules/>`__
-seems to have many of the same operators I've come up with.
-Turns out it's basically a clone of Mathematica.
-
-`Mathematica <https://reference.wolfram.com/language/tutorial/PatternsAndTransformationRules.html>`__\ 's
-functionality is similar to what I came up with.
-
-Maple
-#####
-
-`Maple's pattern matching
-commands <https://www.maplesoft.com/support/help/maple/view.aspx?path=examples/patmatch>`__
-don't look as sophisticated as Mathematica, but there are some
-shorthands for common patterns: algebraic, linear, multilinear.
-
-Rubi
-####
-
-`Rubi <http://www.apmaths.uwo.ca/%7Earich/>`__ symbolically integrates.
 

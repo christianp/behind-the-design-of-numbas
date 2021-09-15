@@ -1,0 +1,61 @@
+.proof {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+.proof {
+    margin:1.5625em auto;
+    padding:0 .6rem .8rem !important;
+    overflow:hidden;
+    page-break-inside:avoid;
+    border-left:.2rem solid;
+    border-left-color: hsl(0, 0%, 63.3%);
+    border-bottom-color:rgba(var(--pst-color-admonition-default),1);
+    border-right-color:rgba(var(--pst-color-admonition-default),1);
+    border-top-color:rgba(var(--pst-color-admonition-default),1);
+    border-radius:0.4rem;
+    box-shadow:0 .2rem .5rem rgba(0,0,0,.05),0 0 .05rem rgba(0,0,0,.1);
+    transition:color .25s,background-color .25s,border-color .25s
+}
+
+.proof :last-child {
+    margin-bottom:0
+}
+.proof .proof-title~* {
+    padding:0 1.4rem
+}
+.proof > ol,
+.proof > ul {
+    margin-left:1em
+}
+
+.proof .proof-title {
+    position:relative;
+    margin:0 -.6rem!important;
+    padding:.4rem .6rem .4rem 2rem;
+    font-weight:700;
+    background: hsl(0, 0%, 93.3%);
+}
+.proof .proof-title .proof-type {
+    font-weight: normal;
+}
+.proof .proof-title+* {
+    margin-top:.4em
+}
+
+/* Toggle proof */
+.proof-type-proof > .proof-title {
+    display: block;
+    clear: both;
+}
+
+.proof-type-proof > .proof-title:after {
+    content: " â–¼";
+}
+
+.proof-type-proof > .proof-title.open:after {
+    content: " â–²";
+}
+
+.proof-content > ul {
+    padding-left: 1em;
+}

@@ -1,10 +1,18 @@
 :root {
     --pst-font-family-base: serif;
     --pst-font-size-base: 17px;
+    --pst-color-inline-code: 171, 20, 90;
 }
 
 code {
     background: #eee;
     padding: 0 0.5em;
     border-radius: 0.4em;
+}
+main.bd-content #main-content dl.module:not(.docutils) code, main.bd-content #main-content dl.class:not(.docutils) code, main.bd-content #main-content dl.exception:not(.docutils) code, main.bd-content #main-content dl.function:not(.docutils) code, main.bd-content #main-content dl.decorator:not(.docutils) code, main.bd-content #main-content dl.data:not(.docutils) code, main.bd-content #main-content dl.method:not(.docutils) code, main.bd-content #main-content dl.attribute:not(.docutils) code {
+    font-weight: normal;
+}
+
+li + li {
+    margin-top: 0.5em;
 }
